@@ -1,44 +1,61 @@
-"""Compaction table behaviour: stable indices, reserved values, unknown ids."""
+"""Offset compaction: passthrough where the block fits, shift where it does not."""
 
 from __future__ import annotations
 
 from miele_nats_bridge.programs import (
     NONE,
     OTHER,
-    PROGRAM_IDS,
+    PHASE_OFFSET,
+    PROGRAM_OFFSET,
     clean_name,
     compact_phase,
     compact_program,
 )
 
 
-def test_index_is_position_plus_one() -> None:
+def test_small_blocks_pass_through_unchanged() -> None:
+    # The value on the bus stays the one from Miele's own documentation.
+    assert compact_program("geschirrspueler", 3) == 3  # ECO
+    assert compact_program("geschirrspueler", 44) == 44  # PowerWash
+    assert compact_program("backofen", 13) == 13  # Heißluft plus
+    assert compact_program("dampfgarer", 72) == 72  # Sous-vide
+
+
+def test_coffee_block_is_shifted_off_zero() -> None:
+    # 24000 must not land on 0, which means "no program".
     assert compact_program("kaffeemaschine", 24000) == 1
     assert compact_program("kaffeemaschine", 24023) == 24
-    assert compact_program("kaffeemaschine", 24050) == 25
+    assert compact_program("kaffeemaschine", 24050) == 51
 
 
 def test_zero_and_none_map_to_reserved_none() -> None:
     assert compact_program("kaffeemaschine", 0) == NONE
-    assert compact_program("kaffeemaschine", None) == NONE
-    assert compact_phase("backofen", 0) == NONE
+    assert compact_program("geschirrspueler", None) == NONE
+    assert compact_phase("geschirrspueler", 0) == NONE
 
 
-def test_unknown_id_and_unknown_slug_map_to_other() -> None:
-    assert compact_program("kaffeemaschine", 24099) == OTHER
-    assert compact_program("nichtvorhanden", 24000) == OTHER
+def test_value_outside_the_block_maps_to_other() -> None:
+    # The coffee system reports maintenance cycles from a different range.
+    assert compact_program("kaffeemaschine", 17004) == OTHER
+    # An oven id beyond the DPT range cannot be represented either.
+    assert compact_program("backofen", 3073) == OTHER
+    assert compact_program("unbekanntes-geraet", 3) == OTHER
 
 
-def test_empty_table_maps_everything_to_other() -> None:
-    # The four appliances whose program list is still pending must not silently
-    # collapse onto a real index.
-    assert compact_program("backofen", 3000) == OTHER
+def test_phase_blocks_are_shifted() -> None:
+    assert compact_phase("geschirrspueler", 1792) == 1
+    assert compact_phase("geschirrspueler", 1799) == 8
+    assert compact_phase("kaffeemaschine", 4352) == 1
 
 
-def test_indices_stay_below_the_other_sentinel() -> None:
-    for slug, ids in PROGRAM_IDS.items():
-        assert len(ids) < OTHER, f"{slug} table would collide with OTHER"
-        assert len(set(ids)) == len(ids), f"{slug} table has duplicate ids"
+def test_unconfirmed_phase_blocks_report_other() -> None:
+    # The oven phase block start is unknown, so its codes must not be invented.
+    assert compact_phase("backofen", 3073) == OTHER
+    assert compact_phase("dampfgarer", 3078) == OTHER
+
+
+def test_every_appliance_has_both_offsets() -> None:
+    assert PROGRAM_OFFSET.keys() == PHASE_OFFSET.keys()
 
 
 def test_clean_name_normalizes_non_breaking_space() -> None:
