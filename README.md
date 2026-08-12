@@ -78,16 +78,22 @@ only a new consent round can produce a working one.
 ```
 uv run miele-cloud-auth --client-id <id> \
     --refresh-token-out refresh-token \
-    --devices-out devices.json \
-    --programs-out-dir programs/
+    --devices-out devices.json
 ```
 
 Requests `openid mcs_thirdparty_read mcs_thirdparty_write` in one consent round, so the
 command direction needs no second consent. All appliances must be approved at consent
-time. `GET /devices/{id}/programs` is only answered while an appliance is switched on.
+time.
 
-Safari's HTTPS-Only mode blocks the `http://localhost` callback — use another browser or
-pass `--manual`.
+`--programs-out-dir` additionally dumps `GET /devices/{id}/programs` per appliance. This is
+**not part of the normal bootstrap**: the endpoint is only answered while an appliance is
+switched on, and it is not reliably free of side effects — an appliance was observed
+switching itself on and starting a cycle in response. Treat it as a read that can touch the
+hardware: pass it deliberately, with the appliances already on, never as routine.
+
+The `http://localhost:8080/callback` redirect URI is accepted by Miele's Keycloak as-is;
+no registration of the URI is required. Safari's HTTPS-Only mode blocks the callback
+though — use another browser, or pass `--manual` and paste the redirected URL back in.
 
 ## Metrics
 

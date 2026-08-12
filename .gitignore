@@ -19,9 +19,12 @@ venv/
 .env.local
 nats.creds
 nats-password
-# Cloud credentials and API dumps from the consent flow
+# Cloud credentials and API dumps from the consent flow, matching the names
+# miele-cloud-auth actually writes as well as timestamped variants
 client-secret
 refresh-token
 access-token
+devices.json
 devices-*.json
+programs/
 programs-*.json

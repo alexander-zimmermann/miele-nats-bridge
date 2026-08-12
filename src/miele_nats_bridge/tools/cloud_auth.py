@@ -79,7 +79,14 @@ def main() -> None:
     parser.add_argument("--no-browser", action="store_true", help="Do not open a browser")
     parser.add_argument("--refresh-token-out", help="Write the refresh token here (mode 0600)")
     parser.add_argument("--devices-out", help="Write the GET /devices dump here")
-    parser.add_argument("--programs-out-dir", help="Write per-appliance program lists here")
+    parser.add_argument(
+        "--programs-out-dir",
+        help=(
+            "Dump per-appliance program lists. Not part of the normal bootstrap: the "
+            "endpoint answers only while an appliance is on, and is not reliably free of "
+            "side effects — an appliance may switch itself on and start a cycle"
+        ),
+    )
     parser.add_argument("--language", default="de", help="Accept-Language value (default: de)")
     args = parser.parse_args()
 
