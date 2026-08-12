@@ -1,18 +1,17 @@
-"""Compaction of Miele program and phase codes into the 0..255 range of DPT 5.010.
+"""Fitting Miele program and phase codes into the 0..255 range of DPT 5.010.
 
-Miele program ids are namespaced per appliance type and run far above 255 — the
-coffee system alone uses 24000..24050. KNX group addresses cannot carry that, so
-each appliance gets an ordered tuple of the raw ids it can report and the compact
-index is the position in that tuple, starting at 1.
+Miele numbers each appliance family in its own block. Most blocks are small
+enough to pass through untouched — the dishwasher uses 1..44, the ovens 6..75 —
+so the value on the KNX bus stays identical to the one in Miele's own
+documentation, and a firmware update that adds an operating mode shows up with a
+stable number of its own instead of forcing a renumbering in Basalte.
 
-Two rules keep the index stable for Basalte, which stores it per scene:
+Only blocks that start beyond 255 need shifting, which one subtrahend per
+appliance expresses completely. No lookup tables, and therefore no ordering to
+preserve.
 
-- never reorder or remove an entry; append new ids at the end
-- an id missing from the tuple maps to OTHER, never to a neighbouring index
-
-The raw ids come from ``GET /v1/devices/{id}/programs``, which the appliance only
-answers while it is switched on. The plain-text program name is published to NATS
-and archived unchanged; only the KNX side sees the compact index.
+The raw code and the plain-text name are published to NATS unshifted; only the
+KNX side sees the compacted value.
 """
 
 from __future__ import annotations
@@ -21,78 +20,54 @@ from __future__ import annotations
 NONE = 0
 OTHER = 255
 
-# Ordered raw program ids per appliance slug; compact index = position + 1.
-PROGRAM_IDS: dict[str, tuple[int, ...]] = {
-    # CVA7845, from GET /devices/{id}/programs. 24050 is reported without a name.
-    "kaffeemaschine": (
-        24000,  # Ristretto
-        24001,  # Espresso
-        24002,  # Kaffee
-        24003,  # Kaffee lang
-        24004,  # Cappuccino
-        24005,  # Cappuccino Italiano
-        24006,  # Latte macchiato
-        24007,  # Espresso macchiato
-        24008,  # Cafè au lait
-        24009,  # Caffè latte
-        24010,  # Caffè Americano
-        24011,  # Long black
-        24012,  # Flat white
-        24013,  # Heißwasser
-        24014,  # Warmwasser
-        24015,  # Heiße Milch
-        24016,  # Milchschaum
-        24017,  # Schwarzer Tee
-        24018,  # Kräutertee
-        24019,  # Früchtetee
-        24020,  # Grüner Tee
-        24021,  # Weißer Tee
-        24022,  # Japan Tee
-        24023,  # Chai Latte
-        24050,
-    ),
-    # The warming drawer has no programs at all; /programs returns an empty list.
-    "tellerwaermer": (),
-    # Pending: these four answer /programs only while switched on.
-    "geschirrspueler": (),
-    "backofen": (),
-    "mikrowelle": (),
-    "dampfgarer": (),
+# Subtrahend per appliance slug. 0 passes the raw id through unchanged.
+#
+# The coffee system numbers its beverages from 24000, so it subtracts 23999
+# rather than 24000: that puts the first beverage at 1 and keeps 0 reserved.
+PROGRAM_OFFSET: dict[str, int] = {
+    "geschirrspueler": 0,  # observed 1..44
+    "backofen": 0,  # observed 6..31
+    "tellerwaermer": 0,  # no programs at all
+    "mikrowelle": 0,  # observed 6..31
+    "kaffeemaschine": 23999,  # observed 24000..24050
+    "dampfgarer": 0,  # observed 6..75
 }
 
-# Ordered raw programPhase codes per appliance slug; same indexing rule.
-# Miele blocks phase codes per device type well above 255, so they need the same
-# treatment as program ids. Populated from observed runs.
-PHASE_IDS: dict[str, tuple[int, ...]] = {
-    "geschirrspueler": (),
-    "backofen": (),
-    "tellerwaermer": (),
-    "mikrowelle": (),
-    "kaffeemaschine": (),
-    "dampfgarer": (),
+# Same mechanism for programPhase, whose blocks all start well beyond 255.
+#
+# Only two block starts are confirmed by observation so far. The ovens keep a
+# zero offset, which reports OTHER for their phases — honest until a real run
+# reveals where their block begins.
+PHASE_OFFSET: dict[str, int] = {
+    "geschirrspueler": 1791,  # block starts at 1792
+    "kaffeemaschine": 4351,  # block starts at 4352
+    "backofen": 0,  # unconfirmed
+    "mikrowelle": 0,  # unconfirmed
+    "dampfgarer": 0,  # unconfirmed
+    "tellerwaermer": 0,  # no programs, no phases
 }
 
 
-def _compact(table: dict[str, tuple[int, ...]], slug: str, raw: int | None) -> int:
+def _compact(offsets: dict[str, int], slug: str, raw: int | None) -> int:
     if raw is None or raw == 0:
         return NONE
-    try:
-        index = table[slug].index(raw) + 1
-    except KeyError, ValueError:
+    offset = offsets.get(slug)
+    if offset is None:
         return OTHER
-    # A table longer than 254 entries would collide with OTHER; report OTHER
-    # rather than silently aliasing two programs onto the same index.
-    return index if index < OTHER else OTHER
+    value = raw - offset
+    # Anything outside the appliance's own block lands here, e.g. the coffee
+    # system's maintenance cycles, which are numbered in a different range.
+    return value if 0 < value < OTHER else OTHER
 
 
 def compact_program(slug: str, raw: int | None) -> int:
-    """Map a raw ProgramID to its stable 1..254 index, or OTHER when unknown."""
-    return _compact(PROGRAM_IDS, slug, raw)
+    """Shift a raw ProgramID into 1..254, or OTHER when it falls outside the block."""
+    return _compact(PROGRAM_OFFSET, slug, raw)
 
 
 def compact_phase(slug: str, raw: int | None) -> int:
-    """Map a raw programPhase to its stable 1..254 index, or OTHER when unknown."""
-    return _compact(PHASE_IDS, slug, raw)
+    """Shift a raw programPhase into 1..254, or OTHER when it falls outside the block."""
+    return _compact(PHASE_OFFSET, slug, raw)
 
 
 def clean_name(value: str | None) -> str:

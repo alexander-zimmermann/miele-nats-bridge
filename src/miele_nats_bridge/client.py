@@ -1,8 +1,10 @@
 """Miele 3rd Party API access: REST reads plus the server-sent event stream.
 
-Localization is requested via the ``Accept-Language`` header, not the documented
-``?language=`` query parameter — the events endpoint ignores the query form and
-answers in English regardless.
+Localization has to be requested **both ways**, because the two halves of the API
+disagree about how: the REST endpoints honour only the documented ``?language=``
+query parameter and ignore ``Accept-Language``, while the events endpoint does the
+exact opposite. Sending one form alone yields English from half the API, which
+would put two languages into the same archive.
 """
 
 from __future__ import annotations
@@ -76,8 +78,13 @@ class MieleClient:
     async def _get(self, path: str) -> Any:
         headers = await self._headers()
         headers["Accept"] = "application/json"
+        # REST honours only the query parameter; the header is sent anyway so both
+        # halves of the API are addressed the same way.
         response = await self._http.get(
-            f"{self._settings.api_base}{path}", headers=headers, timeout=_REST_TIMEOUT
+            f"{self._settings.api_base}{path}",
+            headers=headers,
+            params={"language": self._settings.language},
+            timeout=_REST_TIMEOUT,
         )
         if response.status_code == httpx.codes.TOO_MANY_REQUESTS:
             self._metrics.api_errors.labels(reason="rate_limited").inc()

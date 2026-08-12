@@ -34,9 +34,11 @@ The Miele dialect is resolved here so downstream consumers see scalars only:
 - `value_localized` is already in °C, so no 1/100 scaling is applied.
 - `remainingTime` / `startTime` / `elapsedTime` arrive as `[hours, minutes]` and become
   plain minutes.
-- Program and phase codes run far above 255 (the coffee system uses 24000..24050) and are
-  compacted to a stable index for DPT 5.010, while the plain-text name is published
-  unchanged for archival. See `programs.py` for the tables and the append-only rule.
+- Program and phase codes are fitted into DPT 5.010 by one subtrahend per appliance. Most
+  blocks already fit (dishwasher 1..44, ovens 6..75) and pass through unchanged, so the bus
+  value matches Miele's own documentation; only the coffee system's 24000..24050 and the
+  phase blocks are shifted. The raw code and plain-text name are published unshifted. See
+  `programs.py`.
 - Program names contain non-breaking spaces, which are normalized to plain spaces.
 
 ## Configuration
