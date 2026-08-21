@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     sse_backoff_initial_seconds: float = 5.0
     sse_backoff_max_seconds: float = 300.0
 
+    # Smallest temperature movement worth a publish, in °C. Appliances report
+    # 1/100 °C and drift continuously even while switched off. 0 disables it.
+    temperature_min_delta_c: float = 0.5
+
     # NATS
     nats_servers: str = "nats://localhost:4222"
     nats_subject_prefix: str = "miele"
@@ -120,6 +124,13 @@ class Settings(BaseSettings):
     def _positive(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("must be > 0 seconds")
+        return v
+
+    @field_validator("temperature_min_delta_c")
+    @classmethod
+    def _non_negative(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("must be >= 0 °C")
         return v
 
     def load_appliances(self) -> list[ApplianceConfig]:

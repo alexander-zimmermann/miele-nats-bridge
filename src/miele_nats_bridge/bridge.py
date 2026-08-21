@@ -18,7 +18,7 @@ from .auth import ConsentRequiredError
 from .client import MieleClient, RateLimitedError
 from .config import ApplianceConfig, Settings
 from .metrics import Metrics
-from .normalize import normalize_eco, normalize_state
+from .normalize import TEMPERATURE_KEYS, normalize_eco, normalize_state
 from .publisher import Publisher
 
 logger = logging.getLogger(__name__)
@@ -122,7 +122,37 @@ class MieleBridge:
         if not payload:
             return
         key = (appliance.name, kind)
-        if self._last.get(key) == payload:
+        if not self._is_change(self._last.get(key), payload):
             return
         self._last[key] = payload
         self._publisher.enqueue(appliance.name, kind, subject, payload)
+
+    def _is_change(self, previous: dict[str, Any] | None, payload: dict[str, Any]) -> bool:
+        """Whether a payload differs enough from the last published one to republish.
+
+        Every field but the temperatures counts as changed on any difference.
+        Temperatures need to move by at least the configured threshold: the
+        appliances report 1/100 °C and drift continuously even while switched
+        off, which would otherwise publish every few seconds forever. The
+        comparison is against the last *published* payload, not the last one
+        seen, so slow drift still crosses the threshold eventually instead of
+        creeping past it in sub-threshold steps.
+        """
+        if previous is None or previous.keys() != payload.keys():
+            return True
+
+        threshold = self._settings.temperature_min_delta_c
+        for key, value in payload.items():
+            other = previous[key]
+            if (
+                threshold > 0
+                and key in TEMPERATURE_KEYS
+                and isinstance(value, float)
+                and isinstance(other, float)
+            ):
+                if abs(value - other) >= threshold:
+                    return True
+                continue
+            if other != value:
+                return True
+        return False
