@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -129,6 +130,10 @@ class MieleClient:
                 async for event in source.aiter_sse():
                     kind = event.event or "message"
                     self._metrics.events.labels(kind=kind).inc()
+                    # Every frame proves the connection is alive, the keep-alive
+                    # included — that is the only thing it is good for, and the
+                    # only signal that arrives on a fixed interval.
+                    self._metrics.last_event_ts.set(time.time())
                     # Parsing the keep-alive would count one API error per ping
                     # and leave api_errors_total useless for alerting.
                     if kind == _KEEPALIVE_EVENT or not event.data:

@@ -73,7 +73,8 @@ class Metrics:
         )
         self.last_event_ts = Gauge(
             "miele_last_event_received_timestamp",
-            "Unix timestamp of the last event received from the cloud (seconds)",
+            "Unix timestamp of the last SSE frame received, keep-alive included: "
+            "stream liveness, not appliance activity, which is bursty",
             registry=self.registry,
         )
         # Surface logger-health state so a stuck stdout is visible in Prometheus,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, cast
 
 import httpx
@@ -57,6 +58,19 @@ async def test_keepalive_is_not_an_api_error() -> None:
         metrics.registry.get_sample_value("miele_api_errors_total", {"reason": "bad_event_json"})
         is None
     )
+
+
+@respx.mock
+async def test_keepalive_counts_as_stream_liveness() -> None:
+    """The ping is the only frame on a fixed interval, so it has to refresh the clock."""
+    _mock_stream(PING)
+    metrics = Metrics()
+    before = time.time()
+
+    await _drain(_client(metrics))
+
+    last = metrics.registry.get_sample_value("miele_last_event_received_timestamp")
+    assert last is not None and last >= before
 
 
 @respx.mock
