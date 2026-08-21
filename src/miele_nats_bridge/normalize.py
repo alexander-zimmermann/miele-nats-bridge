@@ -26,6 +26,18 @@ from .programs import clean_name, compact_phase, compact_program
 # Miele reports "no value" for temperatures as -32768 rather than omitting the field.
 TEMPERATURE_SENTINEL = -32768
 
+# Published key -> Miele field for the four temperatures.
+_TEMPERATURE_FIELDS: tuple[tuple[str, str], ...] = (
+    ("temperature_c", "temperature"),
+    ("target_temperature_c", "targetTemperature"),
+    ("core_temperature_c", "coreTemperature"),
+    ("core_target_temperature_c", "coreTargetTemperature"),
+)
+
+# Drifting analogue values: the bridge's change filter ignores movement below a
+# threshold on these, everything else counts as changed on any difference.
+TEMPERATURE_KEYS = frozenset(key for key, _ in _TEMPERATURE_FIELDS)
+
 # light: 1 = on, 2 = off. Any other value is left to the raw field alone.
 _LIGHT_ON = 1
 _LIGHT_OFF = 2
@@ -117,12 +129,7 @@ def normalize_state(slug: str, state: dict[str, Any]) -> dict[str, Any]:
         if minutes is not None:
             out[key] = minutes
 
-    for key, source in (
-        ("temperature_c", "temperature"),
-        ("target_temperature_c", "targetTemperature"),
-        ("core_temperature_c", "coreTemperature"),
-        ("core_target_temperature_c", "coreTargetTemperature"),
-    ):
+    for key, source in _TEMPERATURE_FIELDS:
         celsius = _celsius(state.get(source))
         if celsius is not None:
             out[key] = celsius

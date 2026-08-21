@@ -25,6 +25,14 @@ than published as null, so a consumer keeps the last known value.
 The cloud repeats the full state of every appliance every few seconds; the bridge
 publishes only when a normalized payload actually changed.
 
+**Temperatures need a threshold on top of that.** They are reported in 1/100 °C and drift
+continuously even while the appliance is switched off — an idle Tellerwärmer sliding from
+28.31 to 28.20 °C over four minutes counts as eleven changes. A temperature therefore has
+to move by `TEMPERATURE_MIN_DELTA_C` (default 0.5) before it alone triggers a publish; any
+other field still publishes on any difference. The comparison runs against the last
+*published* payload, so slow drift crosses the threshold eventually rather than creeping
+past it in sub-threshold steps.
+
 ## Normalization
 
 The Miele dialect is resolved here so downstream consumers see scalars only:
@@ -59,6 +67,7 @@ appliances:
 | `MIELE_CLIENT_SECRET_FILE` | `.../credentials/client-secret` | OAuth2 client secret |
 | `MIELE_REFRESH_TOKEN_FILE` | `.../credentials/refresh-token` | initial refresh token |
 | `MIELE_TOKEN_STATE_FILE` | `/var/lib/miele-nats-bridge/refresh-token` | rotated token (PVC) |
+| `TEMPERATURE_MIN_DELTA_C` | `0.5` | temperature drift worth a publish; `0` disables |
 | `NATS_SERVERS` | `nats://localhost:4222` | NATS endpoints |
 | `NATS_STREAM_NAME` | `MIELE` | JetStream stream to verify at startup |
 | `METRICS_PORT` | `9090` | `/metrics` and `/healthz` |
