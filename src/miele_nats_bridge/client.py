@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 _SSE_READ_TIMEOUT = 300.0
 _REST_TIMEOUT = 30.0
 
+# Keep-alive event: carries a bare timestamp, not JSON, roughly every 20s.
+_KEEPALIVE_EVENT = "ping"
+
 
 class RateLimitedError(RuntimeError):
     """HTTP 429 from the cloud API; carries the server's requested delay."""
@@ -126,7 +129,9 @@ class MieleClient:
                 async for event in source.aiter_sse():
                     kind = event.event or "message"
                     self._metrics.events.labels(kind=kind).inc()
-                    if not event.data:
+                    # Parsing the keep-alive would count one API error per ping
+                    # and leave api_errors_total useless for alerting.
+                    if kind == _KEEPALIVE_EVENT or not event.data:
                         continue
                     try:
                         yield kind, json.loads(event.data)
