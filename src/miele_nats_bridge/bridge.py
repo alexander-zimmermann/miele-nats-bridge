@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import time
 from typing import Any
 
 from .auth import ConsentRequiredError
@@ -64,7 +63,6 @@ class MieleBridge:
                 await self._resync("reconnect" if self._last else "startup")
                 async for kind, payload in self._client.stream_events():
                     if kind == "devices" and isinstance(payload, dict):
-                        self._metrics.last_event_ts.set(time.time())
                         self._handle_devices(payload)
                 backoff = self._settings.sse_backoff_initial_seconds
                 logger.warning("event stream ended without error, reconnecting")
