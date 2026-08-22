@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from miele_nats_bridge.programs import (
     NONE,
     OTHER,
@@ -48,17 +50,58 @@ def test_phase_blocks_are_shifted() -> None:
     assert compact_phase("kaffeemaschine", 4352) == 1
 
 
-def test_unconfirmed_phase_blocks_report_other() -> None:
-    # The oven phase block start is unknown, so its codes must not be invented.
-    assert compact_phase("backofen", 3073) == OTHER
+def test_codes_outside_the_block_report_other() -> None:
+    # 3078 belongs to the oven block; the steam oven blocks elsewhere entirely.
     assert compact_phase("dampfgarer", 3078) == OTHER
+    assert compact_phase("geschirrspueler", 4352) == OTHER
 
 
 def test_every_appliance_has_both_offsets() -> None:
     assert PROGRAM_OFFSET.keys() == PHASE_OFFSET.keys()
+    # A zero phase offset means the block start was never confirmed, which is
+    # how three appliances reported nothing but OTHER for a week.
+    assert all(offset > 0 for offset in PHASE_OFFSET.values())
 
 
 def test_clean_name_normalizes_non_breaking_space() -> None:
     assert clean_name("Latte\xa0macchiato") == "Latte macchiato"
     assert clean_name("") == ""
     assert clean_name(None) == ""
+
+
+# Phase block starts, each confirmed against archived runs of the real appliance.
+# Miele blocks phases at deviceType * 256; the Tellerwärmer reports out of the
+# oven's block despite being deviceType 25, so the table is observed, not derived.
+OBSERVED_PHASES = [
+    ("geschirrspueler", 1792, 1),
+    ("geschirrspueler", 1794, 3),
+    ("geschirrspueler", 1800, 9),
+    ("backofen", 3073, 2),
+    ("backofen", 3078, 7),
+    ("backofen", 3084, 13),
+    ("tellerwaermer", 3073, 2),
+    ("tellerwaermer", 3094, 23),
+    ("mikrowelle", 3330, 3),
+    ("mikrowelle", 3334, 7),
+    ("kaffeemaschine", 4352, 1),
+    ("kaffeemaschine", 4405, 54),
+    ("dampfgarer", 7938, 3),
+    ("dampfgarer", 7961, 26),
+]
+
+
+@pytest.mark.parametrize(("slug", "raw", "expected"), OBSERVED_PHASES)
+def test_observed_phase_codes_compact_into_range(slug: str, raw: int, expected: int) -> None:
+    assert compact_phase(slug, raw) == expected
+
+
+def test_runtime_only_program_ids_still_report_other() -> None:
+    """Scattered runtime ids have no block, so OTHER is the honest answer."""
+    for slug, raw in (
+        ("kaffeemaschine", 17004),
+        ("kaffeemaschine", 24787),
+        ("dampfgarer", 333),
+        ("dampfgarer", 2028),
+        ("dampfgarer", 2048),
+    ):
+        assert compact_program(slug, raw) == OTHER

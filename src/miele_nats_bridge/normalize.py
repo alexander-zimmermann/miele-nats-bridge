@@ -26,6 +26,9 @@ from .programs import clean_name, compact_phase, compact_program
 # Miele reports "no value" for temperatures as -32768 rather than omitting the field.
 TEMPERATURE_SENTINEL = -32768
 
+# Physical floor: -327.68 °C is the sentinel divided by 100 and is equally impossible.
+ABSOLUTE_ZERO_C = -273.15
+
 # Published key -> Miele field for the four temperatures.
 _TEMPERATURE_FIELDS: tuple[tuple[str, str], ...] = (
     ("temperature_c", "temperature"),
@@ -51,7 +54,15 @@ def _first(values: Any) -> dict[str, Any] | None:
 
 
 def _celsius(values: Any) -> float | None:
-    """Read a temperature array's first entry, dropping the -32768 sentinel."""
+    """Read a temperature array's first entry, dropping the -32768 sentinel.
+
+    Checking ``value_raw`` alone is not enough: the core-temperature fields
+    deliver the sentinel through ``value_localized`` instead, which is how
+    -32768 reached the archive on every single row of four appliances. The
+    check therefore runs on the value about to be returned, and rejects
+    anything below absolute zero — no reading can be colder than that, whatever
+    encoding it arrives in.
+    """
     entry = _first(values)
     if entry is None:
         return None
@@ -60,9 +71,13 @@ def _celsius(values: Any) -> float | None:
         return None
     localized = entry.get("value_localized")
     if isinstance(localized, int | float):
-        return float(localized)
-    # Fall back to the raw 1/100 °C encoding when the API omits the localized form.
-    return round(float(raw) / 100.0, 2)
+        celsius = float(localized)
+    else:
+        # Fall back to the raw 1/100 °C encoding when the API omits the localized form.
+        celsius = round(float(raw) / 100.0, 2)
+    if celsius == TEMPERATURE_SENTINEL or celsius < ABSOLUTE_ZERO_C:
+        return None
+    return celsius
 
 
 def _minutes(value: Any) -> int | None:
