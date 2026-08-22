@@ -24,10 +24,16 @@ OTHER = 255
 #
 # The coffee system numbers its beverages from 24000, so it subtracts 23999
 # rather than 24000: that puts the first beverage at 1 and keeps 0 reserved.
+#
+# These cover the *selectable* programs. Some appliances additionally report
+# runtime-only ids from unrelated ranges — the coffee system 17004 and
+# 24758..24787, the steam oven 333, 2028 and 2048 — which are scattered rather
+# than blocked, so no subtrahend expresses them. They report OTHER on purpose;
+# a lookup table would be a guess dressed up as a mapping.
 PROGRAM_OFFSET: dict[str, int] = {
     "geschirrspueler": 0,  # observed 1..44
     "backofen": 0,  # observed 6..31
-    "tellerwaermer": 0,  # no programs at all
+    "tellerwaermer": 0,  # selectable list empty, yet reports 2..4 at runtime
     "mikrowelle": 0,  # observed 6..31
     "kaffeemaschine": 23999,  # observed 24000..24050
     "dampfgarer": 0,  # observed 6..75
@@ -35,16 +41,17 @@ PROGRAM_OFFSET: dict[str, int] = {
 
 # Same mechanism for programPhase, whose blocks all start well beyond 255.
 #
-# Only two block starts are confirmed by observation so far. The ovens keep a
-# zero offset, which reports OTHER for their phases — honest until a real run
-# reveals where their block begins.
+# Every block observed so far starts at deviceType * 256, and the offset is one
+# below that so the block's first code lands on 1 and 0 stays "no phase".
+# The Tellerwärmer is the exception that proves it is worth observing rather
+# than deriving: it is deviceType 25 but reports out of the oven's block.
 PHASE_OFFSET: dict[str, int] = {
-    "geschirrspueler": 1791,  # block starts at 1792
-    "kaffeemaschine": 4351,  # block starts at 4352
-    "backofen": 0,  # unconfirmed
-    "mikrowelle": 0,  # unconfirmed
-    "dampfgarer": 0,  # unconfirmed
-    "tellerwaermer": 0,  # no programs, no phases
+    "geschirrspueler": 1791,  # type 7  -> block 1792, observed 1792..1800
+    "backofen": 3071,  # type 12 -> block 3072, observed 3073..3084
+    "tellerwaermer": 3071,  # type 25, yet observed 3073..3094 in the oven block
+    "mikrowelle": 3327,  # type 13 -> block 3328, observed 3330..3334
+    "kaffeemaschine": 4351,  # type 17 -> block 4352, observed 4352..4405
+    "dampfgarer": 7935,  # type 31 -> block 7936, observed 7938..7961
 }
 
 
