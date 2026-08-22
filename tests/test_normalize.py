@@ -118,3 +118,29 @@ def test_eco_reports_energy_and_water() -> None:
     assert out["energy_kwh_unit"] == "kWh"
     assert out["water_l"] == 11.5
     assert out["energy_forecast"] == 0.6
+
+
+def test_sentinel_delivered_through_value_localized_is_dropped() -> None:
+    """How -32768 reached every archived core-temperature row for four appliances."""
+    state = {
+        **IDLE_OVEN,
+        "coreTemperature": [{"value_raw": -3276800, "value_localized": -32768, "unit": "Celsius"}],
+    }
+    assert "core_temperature_c" not in normalize_state("backofen", state)
+
+
+def test_temperature_below_absolute_zero_is_dropped() -> None:
+    """Whatever encoding it arrives in, nothing colder than absolute zero is a reading."""
+    state = {
+        **IDLE_OVEN,
+        "temperature": [{"value_raw": -32769, "value_localized": -327.68, "unit": "Celsius"}],
+    }
+    assert "temperature_c" not in normalize_state("backofen", state)
+
+
+def test_real_readings_survive_the_floor() -> None:
+    state = {
+        **IDLE_OVEN,
+        "temperature": [{"value_raw": 18030, "value_localized": 180.3, "unit": "Celsius"}],
+    }
+    assert normalize_state("backofen", state)["temperature_c"] == 180.3
