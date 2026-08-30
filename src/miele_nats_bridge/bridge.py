@@ -13,12 +13,13 @@ import contextlib
 import logging
 from typing import Any
 
+from nats_bridge_core import Publisher
+
 from .auth import ConsentRequiredError
 from .client import MieleClient, RateLimitedError
 from .config import ApplianceConfig, Settings
 from .metrics import Metrics
 from .normalize import TEMPERATURE_KEYS, normalize_eco, normalize_state
-from .publisher import Publisher
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class MieleBridge:
         if not self._is_change(self._last.get(key), payload):
             return
         self._last[key] = payload
-        self._publisher.enqueue(appliance.name, kind, subject, payload)
+        self._publisher.enqueue((appliance.name, kind), subject, payload)
 
     def _is_change(self, previous: dict[str, Any] | None, payload: dict[str, Any]) -> bool:
         """Whether a payload differs enough from the last published one to republish.

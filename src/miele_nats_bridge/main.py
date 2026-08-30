@@ -10,31 +10,18 @@ import sys
 import time
 
 import httpx
+from nats_bridge_core import Publisher
+from nats_bridge_core import configure as configure_logging
+from nats_bridge_core import serve as serve_metrics
+from nats_bridge_core import watchdog_ok as logger_watchdog_ok
 
 from .auth import ConsentRequiredError, TokenManager
 from .bridge import MieleBridge
 from .client import MieleClient
 from .config import Settings
-from .logging_setup import TrackedStreamHandler
-from .logging_setup import configure as configure_logging
 from .metrics import Metrics
-from .metrics import serve as serve_metrics
-from .publisher import Publisher
 
 logger = logging.getLogger(__name__)
-
-# Liveness fails after this many seconds of consecutive log-emit failures.
-# Forgiving enough for a transient stdout glitch (kubelet log rotation etc.),
-# tight enough that a real wedge causes a restart well within an hour.
-LOG_EMIT_RECOVERY_WINDOW_SECONDS = 60.0
-
-
-def logger_watchdog_ok(now: float) -> bool:
-    """Return False if log emits have been failing for longer than the recovery window."""
-    if TrackedStreamHandler.emit_errors_total <= 0:
-        return True
-    return (now - TrackedStreamHandler.last_emit_ok_ts) <= LOG_EMIT_RECOVERY_WINDOW_SECONDS
-
 
 async def _amain() -> int:
     settings = Settings()
@@ -67,7 +54,7 @@ async def _amain() -> int:
             return False
         return logger_watchdog_ok(time.monotonic())
 
-    http_server = await serve_metrics(metrics, settings.metrics_port, is_healthy)
+    http_server = await serve_metrics(metrics.registry, settings.metrics_port, is_healthy)
 
     bridge: MieleBridge | None = None
     async with httpx.AsyncClient(http2=False) as http:

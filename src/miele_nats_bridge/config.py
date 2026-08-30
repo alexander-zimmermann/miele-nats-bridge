@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 import yaml
+from nats_bridge_core import NatsSettings
 from pydantic import BaseModel, ConfigDict, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Miele moved third-party OAuth to Keycloak; the legacy api.mcs3.miele.com/thirdparty
 # endpoints are announced for deactivation during 2026 and are not used here.
@@ -19,11 +18,6 @@ API_BASE = "https://api.mcs3.miele.com/v1"
 # Read is what the bridge needs; write is requested at consent time so the command
 # path can reuse the same refresh token without a second consent round.
 SCOPES = "openid mcs_thirdparty_read mcs_thirdparty_write"
-
-
-class LogFormat(StrEnum):
-    JSON = "json"
-    TEXT = "text"
 
 
 class ApplianceConfig(BaseModel):
@@ -56,14 +50,7 @@ class ApplianceConfig(BaseModel):
         return f"{self.subject_prefix}.{self.name}.eco"
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
+class Settings(NatsSettings):
     # Appliances: non-secret mapping in a YAML file (ConfigMap).
     miele_appliances_file: Path = Path("/etc/miele-nats-bridge/appliances.yaml")
 
@@ -94,30 +81,8 @@ class Settings(BaseSettings):
     temperature_min_delta_c: float = 0.5
 
     # NATS
-    nats_servers: str = "nats://localhost:4222"
     nats_subject_prefix: str = "miele"
-    nats_creds_file: Path | None = None
-    nats_nkey_seed_file: Path | None = None
-    nats_user: str | None = None
-    nats_user_password_file: Path | None = None
-    nats_stream_check: bool = True
     nats_stream_name: str = "MIELE"
-
-    # Observability
-    metrics_port: int = 9090
-    log_level: str = "INFO"
-    log_format: LogFormat = LogFormat.JSON
-
-    @property
-    def nats_servers_list(self) -> list[str]:
-        return [s.strip() for s in self.nats_servers.split(",") if s.strip()]
-
-    @field_validator("nats_subject_prefix")
-    @classmethod
-    def _single_token(cls, v: str) -> str:
-        if "." in v or "/" in v or " " in v or not v:
-            raise ValueError("must be a non-empty single token (no dots, slashes, spaces)")
-        return v
 
     @field_validator("token_refresh_margin_seconds", "sse_backoff_initial_seconds")
     @classmethod
@@ -198,29 +163,3 @@ class Settings(BaseSettings):
         if not value:
             raise RuntimeError(f"{env_name} {path} is empty")
         return value
-
-    def read_nats_password(self) -> str | None:
-        if self.nats_user_password_file and self.nats_user_password_file.exists():
-            return self.nats_user_password_file.read_text().strip()
-        return None
-
-    def nats_auth_kwargs(self) -> dict[str, Any]:
-        """Build the auth subset of NatsClient.connect kwargs.
-
-        Auth precedence: creds file > nkey seed file > user/password.
-        Each form is mutually exclusive in nats-py; pick the first that's configured.
-        """
-        kwargs: dict[str, Any] = {}
-        if self.nats_creds_file and self.nats_creds_file.exists():
-            kwargs["user_credentials"] = str(self.nats_creds_file)
-        elif self.nats_nkey_seed_file and self.nats_nkey_seed_file.exists():
-            kwargs["nkeys_seed"] = str(self.nats_nkey_seed_file)
-        elif self.nats_user:
-            password = self.read_nats_password()
-            if password is None:
-                raise RuntimeError(
-                    "NATS_USER is set but NATS_USER_PASSWORD_FILE is missing or empty"
-                )
-            kwargs["user"] = self.nats_user
-            kwargs["password"] = password
-        return kwargs
