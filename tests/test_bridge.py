@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from nats_bridge_core import Publisher
+
 from miele_nats_bridge.bridge import MieleBridge
 from miele_nats_bridge.client import MieleClient
 from miele_nats_bridge.config import ApplianceConfig, Settings
 from miele_nats_bridge.metrics import Metrics
-from miele_nats_bridge.publisher import Publisher
 
 # The Tellerwärmer switched off, drifting: this is the payload that produced 69 %
 # of all archived rows before the threshold existed.
@@ -24,10 +25,10 @@ IDLE_WARMER: dict[str, Any] = {
 
 class _FakePublisher:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, str, str, dict[str, Any]]] = []
+        self.calls: list[tuple[object, str, dict[str, Any]]] = []
 
-    def enqueue(self, device: str, kind: str, subject: str, payload: dict[str, Any]) -> bool:
-        self.calls.append((device, kind, subject, payload))
+    def enqueue(self, ctx: object, subject: str, payload: dict[str, Any]) -> bool:
+        self.calls.append((ctx, subject, payload))
         return True
 
     @property
@@ -55,7 +56,9 @@ def _feed(bridge: MieleBridge, payload: dict[str, Any]) -> None:
 def test_first_payload_is_published() -> None:
     bridge, publisher = _bridge()
     _feed(bridge, IDLE_WARMER)
-    assert publisher.calls == [("tellerwaermer", "state", "miele.tellerwaermer.state", IDLE_WARMER)]
+    assert publisher.calls == [
+        (("tellerwaermer", "state"), "miele.tellerwaermer.state", IDLE_WARMER)
+    ]
 
 
 def test_identical_payload_is_suppressed() -> None:
