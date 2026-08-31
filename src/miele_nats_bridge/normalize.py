@@ -41,6 +41,15 @@ _TEMPERATURE_FIELDS: tuple[tuple[str, str], ...] = (
 # threshold on these, everything else counts as changed on any difference.
 TEMPERATURE_KEYS = frozenset(key for key, _ in _TEMPERATURE_FIELDS)
 
+# DPT 16.001 carries exactly 14 bytes, and Latin-1 spends one byte per character,
+# so the character count is the budget. Miele's own wording overruns it for two
+# states; those get a short form, everything else travels unchanged.
+KNX_TEXT_MAX = 14
+STATUS_SHORT: dict[str, str] = {
+    "Programm gewählt": "Progr. gewählt",
+    "nicht verbunden": "Getrennt",
+}
+
 # light: 1 = on, 2 = off. Any other value is left to the raw field alone.
 _LIGHT_ON = 1
 _LIGHT_OFF = 2
@@ -106,6 +115,16 @@ def _localized(field: Any) -> str | None:
     return None
 
 
+def _knx_text(name: str) -> str:
+    """Fit a status name into the 14 characters DPT 16.001 allows."""
+    text = STATUS_SHORT.get(name, name)
+    if len(text) <= KNX_TEXT_MAX:
+        return text
+    # A name nobody has shortened yet: cut rather than drop, so the display
+    # shows something recognisable and the missing short form is obvious.
+    return text[:KNX_TEXT_MAX].rstrip()
+
+
 def normalize_state(slug: str, state: dict[str, Any]) -> dict[str, Any]:
     """Flat appliance-state payload for ``miele.<slug>.state``."""
     out: dict[str, Any] = {}
@@ -117,6 +136,11 @@ def normalize_state(slug: str, state: dict[str, Any]) -> dict[str, Any]:
     status_name = _localized(state.get("status"))
     if status_name:
         out["status_name"] = status_name
+        out["status_text"] = _knx_text(status_name)
+    elif status is not None:
+        # Some codes carry no plain text at all (the coffee system's 147). Naming
+        # them ourselves would be a guess, so the display says which code it is.
+        out["status_text"] = f"Code {status}"
 
     # Program and phase: compact index for KNX, raw id and name for archival.
     program_raw = _raw(state.get("ProgramID"))

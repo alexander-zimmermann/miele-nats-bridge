@@ -48,6 +48,10 @@ The Miele dialect is resolved here so downstream consumers see scalars only:
   phase blocks are shifted. The raw code and plain-text name are published unshifted. See
   `programs.py`.
 - Program names contain non-breaking spaces, which are normalized to plain spaces.
+- `status_text` carries the status as words for a KNX DPT 16.001 group address, which holds
+  exactly 14 bytes. Miele's own wording overruns that for two states, so those have a short
+  form; a code with no plain text at all becomes `Code <n>` rather than an invented word. The
+  untruncated `status_name` still travels alongside for the archive.
 
 ## Configuration
 

@@ -144,3 +144,51 @@ def test_real_readings_survive_the_floor() -> None:
         "temperature": [{"value_raw": 18030, "value_localized": 180.3, "unit": "Celsius"}],
     }
     assert normalize_state("backofen", state)["temperature_c"] == 180.3
+
+
+def _status(raw: int, localized: str | None) -> dict[str, Any]:
+    return {**IDLE_OVEN, "status": {"value_raw": raw, "value_localized": localized}}
+
+
+def test_status_text_passes_short_names_through() -> None:
+    out = normalize_state("backofen", _status(5, "In Betrieb"))
+    assert out["status_text"] == "In Betrieb"
+    assert out["status_name"] == "In Betrieb"
+
+
+def test_status_text_shortens_what_dpt_16_cannot_carry() -> None:
+    """These two are the only observed names above 14 characters."""
+    assert normalize_state("geschirrspueler", _status(3, "Programm gewählt"))["status_text"] == (
+        "Progr. gewählt"
+    )
+    assert normalize_state("backofen", _status(255, "nicht verbunden"))["status_text"] == "Getrennt"
+
+
+def test_status_text_names_the_code_when_miele_supplies_no_text() -> None:
+    """The coffee system reports 147 with an empty name; inventing a word would lie."""
+    out = normalize_state("kaffeemaschine", _status(147, ""))
+    assert out["status_text"] == "Code 147"
+    assert "status_name" not in out
+
+
+def test_every_status_text_fits_dpt_16_001() -> None:
+    """The contract DPT 16.001 imposes: Latin-1 encodable, at most 14 bytes.
+
+    Asserted directly rather than through xknx, which this bridge does not depend on.
+    """
+    from miele_nats_bridge.normalize import KNX_TEXT_MAX, STATUS_SHORT, _knx_text
+
+    observed = [
+        "Aus",
+        "Bereit",
+        "Programm gewählt",
+        "In Betrieb",
+        "Pause",
+        "Ende",
+        "Abbruch",
+        "nicht verbunden",
+        *STATUS_SHORT.values(),
+    ]
+    for name in observed:
+        encoded = _knx_text(name).encode("latin-1")
+        assert len(encoded) <= KNX_TEXT_MAX, name
