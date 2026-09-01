@@ -1,6 +1,6 @@
 [project]
 name = "miele-nats-bridge"
-version = "0.6.0"
+version = "0.7.0"
 description = "Bridge Miele kitchen appliances (3rd Party Cloud API, SSE) to NATS JetStream"
 readme = "README.md"
 license = "GPL-2.0-or-later"
