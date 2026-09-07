@@ -451,7 +451,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.23.1" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.5" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.6" },
     { name = "types-pyyaml", marker = "extra == 'dev'" },
 ]
 provides-extras = ["dev"]
