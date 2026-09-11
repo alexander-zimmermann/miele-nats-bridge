@@ -75,6 +75,8 @@ appliances:
 | `NATS_SERVERS` | `nats://localhost:4222` | NATS endpoints |
 | `NATS_STREAM_NAME` | `MIELE` | JetStream stream to verify at startup |
 | `METRICS_PORT` | `9090` | `/metrics` and `/healthz` |
+| `TRACING_ENDPOINT` | unset | OTLP/HTTP collector base URL (`http://host:4318`); unset keeps tracing off |
+| `TRACING_SAMPLING_RATIO` | `0.1` | root sampling ratio; keep it equal to the connect tracer |
 
 ### Token handling
 
