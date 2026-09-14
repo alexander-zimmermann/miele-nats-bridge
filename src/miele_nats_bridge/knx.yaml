@@ -1,0 +1,63 @@
+# KNX descriptor (schema: nats-bridge-core knx-descriptor.schema.json).
+# Per published field the datapoint name on the bus, the DPT this bridge serves
+# and the writer behaviour. Product family only: which appliances exist and
+# which group addresses they get is bound in lares.
+subjects:
+  state:
+    fields:
+      status:
+        datapoint: Status
+        dpt: "5.010"
+        seed_on_start: true
+        min_delta: 0
+      status_text:
+        datapoint: Statustext
+        dpt: "16.001"
+        seed_on_start: true
+        min_delta: 0
+      failure:
+        datapoint: Störung
+        dpt: "1.005"
+        seed_on_start: true
+        min_delta: 0
+      program:
+        datapoint: Programm
+        dpt: "5.010"
+        seed_on_start: true
+        min_delta: 0
+      phase:
+        datapoint: Programm-Phase
+        dpt: "5.010"
+        seed_on_start: true
+        min_delta: 0
+      remaining_minutes:
+        datapoint: Restzeit
+        dpt: "7.006"
+        seed_on_start: true
+        min_delta: 1
+      temperature_c:
+        datapoint: Ist-Temperatur
+        dpt: "9.001"
+        seed_on_start: true
+        min_delta: 0.5
+      core_temperature_c:
+        datapoint: Kern-Ist-Temperatur
+        dpt: "9.001"
+        seed_on_start: true
+        min_delta: 0.5
+      door_open:
+        datapoint: Tür-Offen
+        dpt: "1.019"
+        seed_on_start: true
+        min_delta: 0
+      info:
+        # Named per product: "finished" on dishwasher and oven, a general notice elsewhere
+        datapoint: [Hinweis-Fertig, Hinweis]
+        dpt: "1.005"
+        seed_on_start: true
+        min_delta: 0
+      remote_control:
+        datapoint: Fernsteuerung
+        dpt: "1.003"
+        seed_on_start: true
+        min_delta: 0

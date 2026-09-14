@@ -53,6 +53,17 @@ The Miele dialect is resolved here so downstream consumers see scalars only:
   form; a code with no plain text at all becomes `Code <n>` rather than an invented word. The
   untruncated `status_name` still travels alongside for the archive.
 
+## KNX descriptor
+
+`knx.yaml` at the package root declares which `state` fields are meant for the bus,
+under which datapoint name, with which DPT and writer behaviour — the format
+`nats-bridge-core` defines. lares binds each appliance to its group-address name
+prefix and generates the writer rules from both; the descriptor itself knows no
+appliances and no addresses. `info` lists two datapoint names because Miele's
+products disagree (`Hinweis-Fertig` on the dishwasher and oven, `Hinweis` elsewhere);
+the generator takes the first the catalog has. A test loads the descriptor through
+the core loader and fails on any field the normalized payload does not carry.
+
 ## Configuration
 
 Appliances come from a YAML file (ConfigMap), credentials from files (Secret):
