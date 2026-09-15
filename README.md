@@ -73,7 +73,11 @@ appliances:
   - device_id: "000105454657"
     name: geschirrspueler
     model: G7560
+    ga_name: Haushaltstechnik.Geschirrspüler # optional, read by lares only
 ```
+
+`ga_name` is the group-address name prefix lares binds the appliance to (see
+[KNX descriptor](#knx-descriptor)); the bridge accepts it and ignores it.
 
 | Env var | Default | Purpose |
 | --- | --- | --- |

@@ -33,6 +33,9 @@ class ApplianceConfig(BaseModel):
     # Free-text, only for log lines; the API reports deviceName as empty.
     model: str = ""
     subject_prefix: str = "miele"
+    # Group-address name prefix lares binds this appliance to; read by the
+    # lares mapping generator, never by the bridge.
+    ga_name: str = ""
 
     @field_validator("name", "subject_prefix")
     @classmethod
