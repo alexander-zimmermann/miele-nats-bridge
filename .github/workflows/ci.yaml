@@ -11,6 +11,6 @@ concurrency:
 
 jobs:
   test:
-    uses: alexander-zimmermann/lares/.github/workflows/sidecar-python-ci.yaml@c5a9231828d81a95ff685c385280f567538b2c39 # main
+    uses: alexander-zimmermann/lares/.github/workflows/sidecar-python-ci.yaml@027c3cc3f01ed56bd7c096dfc0ae07429835ff8e # main
     with:
       python-version: "3.15"
